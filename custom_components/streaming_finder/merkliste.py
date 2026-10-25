@@ -97,7 +97,8 @@ class MerklisteKoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             )
         except quellen.QuellenFehler as err:
             raise HomeAssistantError(str(err)) from err
-        treffer = next((e for e in suche.get("results") or [] if e.get("media_type") in ("tv", "movie")), None)
+        kandidaten = [e for e in suche.get("results") or [] if e.get("media_type") in ("tv", "movie")]
+        treffer = (quellen.bester_treffer(text, kandidaten) or [None])[0]
         if treffer is None:
             raise HomeAssistantError(f"Bei TMDB nichts zu „{text}“ gefunden.")
         await self._setzen(treffer["media_type"], treffer["id"], True)

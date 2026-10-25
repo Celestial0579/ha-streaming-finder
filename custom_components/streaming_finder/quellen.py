@@ -187,3 +187,14 @@ async def merkliste_setzen(
         sitzung, lese_token, f"/account/{konto_v3}/watchlist",
         {"media_type": art, "media_id": tmdb_id, "watchlist": merken}, {"session_id": sitzungs_id},
     )
+
+
+def bester_treffer(text: str, ergebnisse: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Ergebnisse mit genau passendem Titel (deutsch oder Original) zuerst, darunter die bekanntesten."""
+    gesucht = text.strip().casefold()
+
+    def namen(e: dict[str, Any]) -> set[str]:
+        return {str(e.get(k) or "").casefold() for k in ("name", "title", "original_name", "original_title")} - {""}
+
+    exakt = sorted((e for e in ergebnisse if gesucht in namen(e)), key=lambda e: -(e.get("vote_count") or 0))
+    return exakt + [e for e in ergebnisse if gesucht not in namen(e)]

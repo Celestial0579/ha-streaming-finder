@@ -82,7 +82,7 @@ class Finder:
         try:
             suche = await self._tmdb(pfad, parameter, 12 * STUNDE)
             treffer = []
-            for e in suche.get("results") or []:
+            for e in quellen.bester_treffer(titel, suche.get("results") or []):
                 typ = e.get("media_type") or ("tv" if art == "serie" else "movie")
                 if typ not in ("tv", "movie"):
                     continue
