@@ -198,3 +198,11 @@ def bester_treffer(text: str, ergebnisse: list[dict[str, Any]]) -> list[dict[str
 
     exakt = sorted((e for e in ergebnisse if gesucht in namen(e)), key=lambda e: -(e.get("vote_count") or 0))
     return exakt + [e for e in ergebnisse if gesucht not in namen(e)]
+
+
+async def auf_merkliste(
+    sitzung: aiohttp.ClientSession, lese_token: str, sitzungs_id: str, art: str, tmdb_id: int
+) -> bool:
+    """Steht der Titel laut TMDB schon auf der Merkliste?"""
+    daten = await tmdb(sitzung, lese_token, f"/{art}/{tmdb_id}/account_states", {"session_id": sitzungs_id})
+    return bool(daten.get("watchlist"))

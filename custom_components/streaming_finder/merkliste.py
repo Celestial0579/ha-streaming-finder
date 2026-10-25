@@ -101,6 +101,18 @@ class MerklisteKoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         treffer = (quellen.bester_treffer(text, kandidaten) or [None])[0]
         if treffer is None:
             raise HomeAssistantError(f"Bei TMDB nichts zu „{text}“ gefunden.")
+        name = str(treffer.get("name") or treffer.get("title"))
+        schon_da = any(e["id"] == f"{treffer['media_type']}-{treffer['id']}" for e in self.data or [])
+        if not schon_da and self.config_entry.options.get(CONF_KONTO_SITZUNG):
+            try:
+                schon_da = await quellen.auf_merkliste(
+                    async_get_clientsession(self.hass), self.finder.token, self.config_entry.options[CONF_KONTO_SITZUNG],
+                    treffer["media_type"], treffer["id"],
+                )
+            except quellen.QuellenFehler:
+                schon_da = False
+        if schon_da:
+            raise HomeAssistantError(f"„{name}“ steht schon auf deiner Merkliste.")
         await self._setzen(treffer["media_type"], treffer["id"], True)
         await self.async_request_refresh()
         return str(treffer.get("name") or treffer.get("title"))
