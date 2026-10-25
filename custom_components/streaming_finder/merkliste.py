@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from datetime import timedelta
+import difflib
 import logging
+import re
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -55,6 +57,37 @@ def angebot_text(angebote: dict[str, list[str]] | None) -> str:
     if not teile and (angebote.get("leihen") or angebote.get("kaufen")):
         teile.append("nur leihen/kaufen: " + ", ".join(sorted(set((angebote.get("leihen") or []) + (angebote.get("kaufen") or [])))[:4]))
     return " · ".join(teile) or "derzeit bei keinem Streamingdienst"
+
+
+def _norm(text: str) -> str:
+    return " ".join(re.sub(r"[^\w]+", " ", str(text).casefold()).split())
+
+
+def _haupttitel(titel: str) -> str:
+    """„Spirit - Der wilde Mustang“ → „Spirit“, „Cyberpunk: Edgerunners“ → „Cyberpunk“."""
+    return re.split(r"\s[-–—]\s|:\s", str(titel), maxsplit=1)[0]
+
+
+def passende_eintraege(text: str, eintraege: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Einträge zum gesprochenen Titel: erst genau, dann Haupttitel, dann alle Wörter, dann ungefähr."""
+    gesucht = _norm(text)
+    if not gesucht:
+        return []
+
+    def aehnlich(e: dict[str, Any]) -> bool:
+        return max(difflib.SequenceMatcher(None, gesucht, _norm(n)).ratio() for n in (e["titel"], _haupttitel(e["titel"]))) >= 0.8
+
+    stufen = (
+        lambda e: _norm(e["titel"]) == gesucht,
+        lambda e: _norm(_haupttitel(e["titel"])) == gesucht,
+        lambda e: set(gesucht.split()) <= set(_norm(e["titel"]).split()),
+        aehnlich,
+    )
+    for passt in stufen:
+        treffer = [e for e in eintraege if passt(e)]
+        if treffer:
+            return treffer
+    return []
 
 
 class MerklisteKoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
@@ -151,6 +184,37 @@ class MerklisteKoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         art, _, kennung = uid.partition("-")
         await self._setzen(art, int(kennung), False)
         self.async_set_updated_data([e for e in self.data or [] if e["id"] != uid])
+
+    async def async_entfernen_titel(self, text: str) -> str:
+        """Nimmt einen Titel von der Merkliste, auch verkürzt, leicht verhört oder im Original genannt."""
+        eintraege = self.data or []
+        treffer = passende_eintraege(text, eintraege) or await self._per_suche(text, eintraege)
+        if not treffer:
+            namen = ", ".join(f"„{e['titel']}“" for e in eintraege[:15]) or "nichts"
+            raise IntentHandleError(f"„{text}“ steht nicht auf deiner Merkliste. Darauf stehen: {namen}.")
+        if len(treffer) > 1:
+            namen = ", ".join(f"„{e['titel']}“" for e in treffer)
+            raise IntentHandleError(f"Zu „{text}“ passen mehrere Einträge: {namen}. Welchen meinst du?")
+        await self.async_entfernen(treffer[0]["id"])
+        return str(treffer[0]["titel"])
+
+    async def _per_suche(self, text: str, eintraege: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Englisch oder im Original genannt: bei TMDB suchen und den besten Treffer auf der Liste nehmen."""
+        if not self.finder.token or not eintraege:
+            return []
+        try:
+            suche = await quellen.tmdb(
+                async_get_clientsession(self.hass), self.finder.token, "/search/multi",
+                {"query": text, "language": self.finder.sprache, "include_adult": "false"},
+            )
+        except quellen.QuellenFehler:
+            return []
+        kandidaten = [e for e in suche.get("results") or [] if e.get("media_type") in ("tv", "movie")]
+        nach_id = {e["id"]: e for e in eintraege}
+        for k in quellen.bester_treffer(text, kandidaten):
+            if (e := nach_id.get(f"{k['media_type']}-{k['id']}")) is not None:
+                return [e]
+        return []
 
     async def async_hinzufuegen(self, text: str) -> str:
         try:

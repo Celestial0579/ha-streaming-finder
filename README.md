@@ -15,6 +15,7 @@ Beantwortet zwei Fragen – für Automationen und den Sprachassistenten:
 |---|---|---|
 | `streaming_finder.wo_laeuft` | `titel`, `art` (serie/film/egal), `jahr` | bis zu drei Treffer mit Titel, Jahr und `angebote` (abo, kostenlos, mit_werbung, leihen, kaufen) |
 | `streaming_finder.merkliste` | `aktualisieren` | Einträge der verbundenen TMDB-Merkliste mit Angeboten |
+| `streaming_finder.merkliste_entfernen` | `titel` | Titel von der Merkliste nehmen – auch verkürzt („Spirit“), leicht verhört oder im Original |
 | `streaming_finder.anime_saison` | `saison` (Winter/Frühling/Sommer/Herbst, leer = aktuelle), `jahr`, `anzahl` | Titel, Format, Folgen, Status, nächste Folge, Genres, Bewertung, Plattformen weltweit und – mit TMDB – im Land |
 
 ## Merkliste (TMDB-Watchlist)
@@ -26,6 +27,10 @@ dort „Genehmigen“, zurück und „Senden“ – dein Passwort sieht Home Ass
   **abhaken oder löschen** nimmt einen Titel von der TMDB-Merkliste, **hinzufügen** sucht den Titel bei TMDB und setzt
   den besten Treffer darauf – auch per Sprachassistent („Setz The Boys auf meine Merkliste“)
 - die Aktion `streaming_finder.merkliste` (Antwort mit allen Einträgen und Angeboten)
+- die Aktion `streaming_finder.merkliste_entfernen`: Die Listen-Absichten von Home Assistant finden einen Eintrag nur
+  unter seinem vollen Namen („Spirit - Der wilde Mustang“). Für den Sprachassistenten deshalb diese Aktion als
+  Werkzeug (Skript) freigeben; sie findet den Eintrag auch über den Haupttitel, einzelne Wörter, eine ungefähre
+  Schreibweise oder die TMDB-Suche (englischer bzw. Originaltitel) und fragt nach, wenn mehrere passen.
 - den Kalender **Merkliste-Termine**: anstehende Folgen der laufenden Staffel (Serien) und Starttermine im Land
   (Filme: Kino, digital, DVD/Blu-ray) – ohne eigenen ICS-Feed, direkt aus der Merkliste berechnet
 

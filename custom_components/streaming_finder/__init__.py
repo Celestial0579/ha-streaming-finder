@@ -11,7 +11,14 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
-from .const import CONF_KONTO_TOKEN, DIENST_ANIME_SAISON, DIENST_MERKLISTE, DIENST_WO_LAEUFT, DOMAIN
+from .const import (
+    CONF_KONTO_TOKEN,
+    DIENST_ANIME_SAISON,
+    DIENST_MERKLISTE,
+    DIENST_MERKLISTE_ENTFERNEN,
+    DIENST_WO_LAEUFT,
+    DOMAIN,
+)
 from .finder import Finder
 from .merkliste import MerklisteKoordinator
 
@@ -54,18 +61,31 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.services.async_register(DOMAIN, DIENST_WO_LAEUFT, wo_laeuft, schema=WO_SCHEMA, supports_response=SupportsResponse.ONLY)
     hass.services.async_register(DOMAIN, DIENST_ANIME_SAISON, anime_saison, schema=ANIME_SCHEMA, supports_response=SupportsResponse.ONLY)
 
-    async def merkliste(aufruf: ServiceCall) -> ServiceResponse:
+    def _merkliste() -> MerklisteKoordinator:
         finder = _finder(hass)
         if finder.merkliste is None:
             raise ServiceValidationError("Kein TMDB-Konto verbunden (Streaming-Finder › Konfigurieren › TMDB-Konto verbinden).")
+        return finder.merkliste
+
+    async def merkliste(aufruf: ServiceCall) -> ServiceResponse:
+        finder = _finder(hass)
+        koordinator = _merkliste()
         if aufruf.data.get("aktualisieren"):
-            await finder.merkliste.async_refresh()
-        eintraege = finder.merkliste.data or []
+            await koordinator.async_refresh()
+        eintraege = koordinator.data or []
         return {"anzahl": len(eintraege), "eintraege": [{k: v for k, v in e.items() if k != "id"} for e in eintraege], "land": finder.land}
 
     hass.services.async_register(
         DOMAIN, DIENST_MERKLISTE, merkliste, schema=vol.Schema({vol.Optional("aktualisieren", default=False): cv.boolean}),
         supports_response=SupportsResponse.ONLY,
+    )
+
+    async def merkliste_entfernen(aufruf: ServiceCall) -> ServiceResponse:
+        return {"entfernt": await _merkliste().async_entfernen_titel(aufruf.data["titel"])}
+
+    hass.services.async_register(
+        DOMAIN, DIENST_MERKLISTE_ENTFERNEN, merkliste_entfernen, schema=vol.Schema({vol.Required("titel"): cv.string}),
+        supports_response=SupportsResponse.OPTIONAL,
     )
     return True
 

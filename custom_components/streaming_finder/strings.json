@@ -102,6 +102,16 @@
           "description": "Reload from TMDB first"
         }
       }
+    },
+    "merkliste_entfernen": {
+      "name": "Remove from watchlist",
+      "description": "Takes a title off the TMDB watchlist. The title may be shortened, slightly misheard or given in its original language.",
+      "fields": {
+        "titel": {
+          "name": "Title",
+          "description": "Name as spoken, e.g. Spirit"
+        }
+      }
     }
   },
   "entity": {

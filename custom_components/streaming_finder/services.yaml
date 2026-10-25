@@ -44,3 +44,10 @@ merkliste:
       default: false
       selector:
         boolean:
+merkliste_entfernen:
+  fields:
+    titel:
+      required: true
+      example: "Spirit"
+      selector:
+        text:

@@ -102,6 +102,16 @@
           "description": "Vorher neu von TMDB laden"
         }
       }
+    },
+    "merkliste_entfernen": {
+      "name": "Von der Merkliste nehmen",
+      "description": "Nimmt einen Titel von der TMDB-Merkliste. Der Titel darf verkürzt, leicht verhört oder im Original genannt sein.",
+      "fields": {
+        "titel": {
+          "name": "Titel",
+          "description": "Name wie gesprochen, z. B. Spirit"
+        }
+      }
     }
   },
   "entity": {
