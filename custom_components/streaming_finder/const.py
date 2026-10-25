@@ -5,12 +5,20 @@ DOMAIN = "streaming_finder"
 CONF_TMDB_TOKEN = "tmdb_token"
 CONF_LAND = "land"
 CONF_SPRACHE = "sprache"
+CONF_KONTO_TOKEN = "konto_token"
+CONF_KONTO_ID = "konto_id"
+CONF_KONTO_SITZUNG = "konto_sitzung"
+CONF_KONTO_V3 = "konto_v3"
 
 DEFAULT_LAND = "DE"
 DEFAULT_SPRACHE = "de-DE"
 
 DIENST_WO_LAEUFT = "wo_laeuft"
 DIENST_ANIME_SAISON = "anime_saison"
+DIENST_MERKLISTE = "merkliste"
+
+MERKLISTE_STUNDEN = 6
+MERKLISTE_MAX_SEITEN = 10
 
 SAISONS = {
     "winter": "WINTER", "frühling": "SPRING", "fruehling": "SPRING", "spring": "SPRING",

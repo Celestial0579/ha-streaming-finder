@@ -28,6 +28,8 @@ query ($saison: MediaSeason, $jahr: Int, $anzahl: Int) {
 """
 
 TMDB_URL = "https://api.themoviedb.org/3"
+TMDB4_URL = "https://api.themoviedb.org/4"
+TMDB_FREIGABE = "https://www.themoviedb.org/auth/access?request_token={}"
 
 
 class QuellenFehler(Exception):
@@ -92,3 +94,96 @@ def anbieter(ergebnis: dict[str, Any], land: str) -> dict[str, list[str]] | None
         "leihen": namen("rent"),
         "kaufen": namen("buy"),
     }
+
+
+async def tmdb4(
+    sitzung: aiohttp.ClientSession, token: str, methode: str, pfad: str,
+    inhalt: dict[str, Any] | None = None, parameter: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Aufruf der TMDB-API v4 (Konto); token ist der Lese- oder der Konto-Token."""
+    kopf = {"User-Agent": USER_AGENT, "Accept": "application/json", "Authorization": f"Bearer {token}"}
+    try:
+        async with sitzung.request(
+            methode, f"{TMDB4_URL}{pfad}", json=inhalt, params=parameter or {}, headers=kopf, timeout=_ZEIT
+        ) as antwort:
+            daten = await antwort.json(content_type=None)
+            if antwort.status == 401:
+                raise QuellenFehler("TMDB: Zugriff verweigert" + (f" ({daten.get('status_message')})" if isinstance(daten, dict) else ""))
+            if antwort.status == 429:
+                raise QuellenFehler("TMDB: zu viele Anfragen, bitte später erneut")
+            if antwort.status >= 400:
+                raise QuellenFehler(f"TMDB: HTTP {antwort.status}")
+            return daten
+    except (aiohttp.ClientError, TimeoutError, ValueError) as err:
+        raise QuellenFehler(f"TMDB nicht erreichbar: {err}") from err
+
+
+async def freigabe_anfordern(sitzung: aiohttp.ClientSession, lese_token: str) -> str:
+    """Anfrage-Token, den der Nutzer bei TMDB genehmigt."""
+    daten = await tmdb4(sitzung, lese_token, "POST", "/auth/request_token", {})
+    if not daten.get("request_token"):
+        raise QuellenFehler("TMDB: kein Anfrage-Token erhalten")
+    return daten["request_token"]
+
+
+async def freigabe_abholen(sitzung: aiohttp.ClientSession, lese_token: str, anfrage: str) -> tuple[str, str]:
+    """Nach der Genehmigung: Konto-Token und Konto-Kennung."""
+    daten = await tmdb4(sitzung, lese_token, "POST", "/auth/access_token", {"request_token": anfrage})
+    if not daten.get("access_token") or not daten.get("account_id"):
+        raise QuellenFehler("TMDB: Freigabe noch nicht erteilt")
+    return daten["access_token"], str(daten["account_id"])
+
+
+async def merkliste(
+    sitzung: aiohttp.ClientSession, konto_token: str, konto_id: str, art: str, sprache: str, max_seiten: int
+) -> list[dict[str, Any]]:
+    """Alle Einträge der Merkliste einer Art („tv“ oder „movie“)."""
+    eintraege: list[dict[str, Any]] = []
+    seite = 1
+    while seite <= max_seiten:
+        daten = await tmdb4(
+            sitzung, konto_token, "GET", f"/account/{konto_id}/{art}/watchlist",
+            parameter={"page": seite, "language": sprache, "sort_by": "created_at.desc"},
+        )
+        eintraege.extend(daten.get("results") or [])
+        if seite >= int(daten.get("total_pages") or 1):
+            break
+        seite += 1
+    return eintraege
+
+
+async def tmdb_schreiben(
+    sitzung: aiohttp.ClientSession, lese_token: str, pfad: str, inhalt: dict[str, Any], parameter: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """POST an die TMDB-API v3."""
+    kopf, schluessel = _tmdb_kopf(lese_token)
+    try:
+        async with sitzung.post(
+            f"{TMDB_URL}{pfad}", json=inhalt, params={**(parameter or {}), **schluessel}, headers=kopf, timeout=_ZEIT
+        ) as antwort:
+            daten = await antwort.json(content_type=None)
+            if antwort.status >= 400:
+                text = daten.get("status_message") if isinstance(daten, dict) else None
+                raise QuellenFehler(f"TMDB: HTTP {antwort.status}" + (f" ({text})" if text else ""))
+            return daten
+    except (aiohttp.ClientError, TimeoutError, ValueError) as err:
+        raise QuellenFehler(f"TMDB nicht erreichbar: {err}") from err
+
+
+async def sitzung_aus_konto_token(sitzung: aiohttp.ClientSession, lese_token: str, konto_token: str) -> tuple[str, int]:
+    """Aus dem Konto-Token (v4) eine v3-Sitzung und die v3-Kontonummer ableiten – nötig zum Ändern der Merkliste."""
+    daten = await tmdb_schreiben(sitzung, lese_token, "/authentication/session/convert/4", {"access_token": konto_token})
+    sitzungs_id = daten.get("session_id")
+    if not sitzungs_id:
+        raise QuellenFehler("TMDB: keine Sitzung erhalten")
+    konto = await tmdb(sitzung, lese_token, "/account", {"session_id": sitzungs_id})
+    return sitzungs_id, int(konto["id"])
+
+
+async def merkliste_setzen(
+    sitzung: aiohttp.ClientSession, lese_token: str, konto_v3: int, sitzungs_id: str, art: str, tmdb_id: int, merken: bool
+) -> None:
+    await tmdb_schreiben(
+        sitzung, lese_token, f"/account/{konto_v3}/watchlist",
+        {"media_type": art, "media_id": tmdb_id, "watchlist": merken}, {"session_id": sitzungs_id},
+    )

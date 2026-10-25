@@ -23,15 +23,36 @@
   "options": {
     "step": {
       "init": {
+        "title": "Streaming-Finder",
+        "menu_options": {
+          "schluessel": "Change TMDB key",
+          "konto": "Connect TMDB account (watchlist)",
+          "trennen": "Disconnect TMDB account"
+        }
+      },
+      "schluessel": {
         "title": "TMDB key",
         "description": "Leave empty to work without TMDB.",
         "data": {
           "tmdb_token": "TMDB key (API read access token)"
         }
+      },
+      "konto": {
+        "title": "Connect TMDB account",
+        "description": "1. Open [this link to TMDB]({link}) and click **Approve** (you must be signed in to TMDB).\n2. Come back here and press **Submit**.\n\nYour watchlist then appears as a list in Home Assistant. Checking off or deleting removes a title from the watchlist; adding puts the best TMDB match on it."
+      },
+      "trennen": {
+        "title": "Disconnect TMDB account",
+        "description": "The watchlist disappears from Home Assistant; it stays unchanged on TMDB."
       }
     },
     "error": {
       "tmdb_ungueltig": "TMDB rejected the key.",
+      "tmdb_nicht_erreichbar": "TMDB is unreachable.",
+      "nicht_freigegeben": "TMDB reports no approval yet – please approve on the TMDB page first."
+    },
+    "abort": {
+      "erst_schluessel": "Please enter the TMDB key first.",
       "tmdb_nicht_erreichbar": "TMDB is unreachable."
     }
   },
@@ -70,6 +91,23 @@
           "name": "Count",
           "description": "How many titles (1–50)"
         }
+      }
+    },
+    "merkliste": {
+      "name": "Watchlist",
+      "description": "Entries of the connected TMDB watchlist with streaming offers in the country.",
+      "fields": {
+        "aktualisieren": {
+          "name": "Refresh",
+          "description": "Reload from TMDB first"
+        }
+      }
+    }
+  },
+  "entity": {
+    "todo": {
+      "merkliste": {
+        "name": "Watchlist"
       }
     }
   }

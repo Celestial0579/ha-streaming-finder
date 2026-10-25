@@ -34,6 +34,7 @@ class Finder:
         self.hass = hass
         self.entry = entry
         self._speicher: dict[str, tuple[float, Any]] = {}
+        self.merkliste = None
 
     @property
     def token(self) -> str:
@@ -64,7 +65,7 @@ class Finder:
         schluessel = pfad + "|" + "&".join(f"{k}={v}" for k, v in sorted(parameter.items()))
         return await self._gemerkt(schluessel, dauer, lambda: quellen.tmdb(sitzung, self.token, pfad, parameter))
 
-    async def _angebote(self, art: str, tmdb_id: int) -> dict[str, list[str]] | None:
+    async def angebote(self, art: str, tmdb_id: int) -> dict[str, list[str]] | None:
         daten = await self._tmdb(f"/{art}/{tmdb_id}/watch/providers", {}, 12 * STUNDE)
         return quellen.anbieter(daten, self.land)
 
@@ -91,7 +92,7 @@ class Finder:
                     "originaltitel": e.get("original_name") or e.get("original_title"),
                     "art": "Serie" if typ == "tv" else "Film",
                     "jahr": datum[:4] or None,
-                    "angebote": await self._angebote(typ, e["id"]),
+                    "angebote": await self.angebote(typ, e["id"]),
                 }
                 if eintrag["angebote"] is None:
                     eintrag["hinweis"] = f"In {self.land} derzeit bei keinem Streamingdienst gelistet"
@@ -161,7 +162,7 @@ class Finder:
             for e in suche.get("results") or []:
                 if 16 in (e.get("genre_ids") or []):  # Animation
                     try:
-                        return await self._angebote(art, e["id"])
+                        return await self.angebote(art, e["id"])
                     except quellen.QuellenFehler:
                         return None
         return None

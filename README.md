@@ -14,7 +14,20 @@ Beantwortet zwei Fragen – für Automationen und den Sprachassistenten:
 | Aktion | Felder | Antwort |
 |---|---|---|
 | `streaming_finder.wo_laeuft` | `titel`, `art` (serie/film/egal), `jahr` | bis zu drei Treffer mit Titel, Jahr und `angebote` (abo, kostenlos, mit_werbung, leihen, kaufen) |
+| `streaming_finder.merkliste` | `aktualisieren` | Einträge der verbundenen TMDB-Merkliste mit Angeboten |
 | `streaming_finder.anime_saison` | `saison` (Winter/Frühling/Sommer/Herbst, leer = aktuelle), `jahr`, `anzahl` | Titel, Format, Folgen, Status, nächste Folge, Genres, Bewertung, Plattformen weltweit und – mit TMDB – im Land |
+
+## Merkliste (TMDB-Watchlist)
+
+Unter **Konfigurieren › TMDB-Konto verbinden** genehmigst du einmal den Zugriff auf dein TMDB-Konto (Link zu TMDB,
+dort „Genehmigen“, zurück und „Senden“ – dein Passwort sieht Home Assistant nie). Danach gibt es:
+
+- die Liste **Merkliste** (Serien und Filme, je Eintrag wo er im Land läuft), alle 6 Stunden aktualisiert;
+  **abhaken oder löschen** nimmt einen Titel von der TMDB-Merkliste, **hinzufügen** sucht den Titel bei TMDB und setzt
+  den besten Treffer darauf – auch per Sprachassistent („Setz The Boys auf meine Merkliste“)
+- die Aktion `streaming_finder.merkliste` (Antwort mit allen Einträgen und Angeboten)
+
+**Konfigurieren › TMDB-Konto trennen** entfernt die Merkliste wieder aus Home Assistant.
 
 ## Datenquellen
 

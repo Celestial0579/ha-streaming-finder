@@ -38,3 +38,9 @@ anime_saison:
           min: 1
           max: 50
           mode: box
+merkliste:
+  fields:
+    aktualisieren:
+      default: false
+      selector:
+        boolean:

@@ -23,15 +23,36 @@
   "options": {
     "step": {
       "init": {
+        "title": "Streaming-Finder",
+        "menu_options": {
+          "schluessel": "TMDB-Schlüssel ändern",
+          "konto": "TMDB-Konto verbinden (Merkliste)",
+          "trennen": "TMDB-Konto trennen"
+        }
+      },
+      "schluessel": {
         "title": "TMDB-Schlüssel",
         "description": "Leer lassen, um ohne TMDB zu arbeiten.",
         "data": {
           "tmdb_token": "TMDB-Schlüssel (API Read Access Token)"
         }
+      },
+      "konto": {
+        "title": "TMDB-Konto verbinden",
+        "description": "1. Öffne [diesen Link zu TMDB]({link}) und klicke dort auf **Genehmigen** (du musst bei TMDB angemeldet sein).\n2. Komm hierher zurück und drücke **Senden**.\n\nDanach erscheint deine Merkliste als Liste in Home Assistant. Abhaken oder Löschen nimmt einen Titel von der Merkliste, Hinzufügen setzt den besten TMDB-Treffer darauf."
+      },
+      "trennen": {
+        "title": "TMDB-Konto trennen",
+        "description": "Die Merkliste verschwindet aus Home Assistant; auf TMDB bleibt sie unverändert."
       }
     },
     "error": {
       "tmdb_ungueltig": "TMDB lehnt den Schlüssel ab.",
+      "tmdb_nicht_erreichbar": "TMDB ist nicht erreichbar.",
+      "nicht_freigegeben": "TMDB meldet noch keine Freigabe – bitte zuerst auf der TMDB-Seite genehmigen."
+    },
+    "abort": {
+      "erst_schluessel": "Bitte zuerst den TMDB-Schlüssel eintragen.",
       "tmdb_nicht_erreichbar": "TMDB ist nicht erreichbar."
     }
   },
@@ -70,6 +91,23 @@
           "name": "Anzahl",
           "description": "Wie viele Titel (1–50)"
         }
+      }
+    },
+    "merkliste": {
+      "name": "Merkliste",
+      "description": "Einträge der verbundenen TMDB-Merkliste mit Streaming-Angeboten im Land.",
+      "fields": {
+        "aktualisieren": {
+          "name": "Aktualisieren",
+          "description": "Vorher neu von TMDB laden"
+        }
+      }
+    }
+  },
+  "entity": {
+    "todo": {
+      "merkliste": {
+        "name": "Merkliste"
       }
     }
   }
