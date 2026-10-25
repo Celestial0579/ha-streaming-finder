@@ -1,0 +1,13 @@
+{
+  "domain": "streaming_finder",
+  "name": "Streaming-Finder",
+  "codeowners": ["@Celestial0579"],
+  "config_flow": true,
+  "documentation": "https://github.com/Celestial0579/ha-streaming-finder",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/Celestial0579/ha-streaming-finder/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.1.0"
+}

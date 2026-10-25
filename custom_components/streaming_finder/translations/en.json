@@ -1,0 +1,76 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Streaming Finder",
+        "description": "Country (two letters, e.g. DE) and language for titles. The TMDB key is required for “Where can I watch …?” and for anime availability in your country; without it the anime season lists worldwide platforms from AniList. You can add the key later under “Configure”.",
+        "data": {
+          "land": "Country",
+          "sprache": "Language",
+          "tmdb_token": "TMDB key (API read access token)"
+        }
+      }
+    },
+    "error": {
+      "land_ungueltig": "Please enter a two-letter country code (e.g. DE).",
+      "tmdb_ungueltig": "TMDB rejected the key.",
+      "tmdb_nicht_erreichbar": "TMDB is unreachable."
+    },
+    "abort": {
+      "single_instance_allowed": "Streaming Finder is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "TMDB key",
+        "description": "Leave empty to work without TMDB.",
+        "data": {
+          "tmdb_token": "TMDB key (API read access token)"
+        }
+      }
+    },
+    "error": {
+      "tmdb_ungueltig": "TMDB rejected the key.",
+      "tmdb_nicht_erreichbar": "TMDB is unreachable."
+    }
+  },
+  "services": {
+    "wo_laeuft": {
+      "name": "Where to watch",
+      "description": "Which streaming services offer a series or film in the configured country (subscription, free, with ads, rent, buy).",
+      "fields": {
+        "titel": {
+          "name": "Title",
+          "description": "Name of the series or film"
+        },
+        "art": {
+          "name": "Type",
+          "description": "serie, film or egal (any)"
+        },
+        "jahr": {
+          "name": "Year",
+          "description": "Release year if ambiguous"
+        }
+      }
+    },
+    "anime_saison": {
+      "name": "Anime season",
+      "description": "The most popular anime of a season with status, next episode and platforms.",
+      "fields": {
+        "saison": {
+          "name": "Season",
+          "description": "Winter, spring, summer or fall; empty = current"
+        },
+        "jahr": {
+          "name": "Year",
+          "description": "empty = current year"
+        },
+        "anzahl": {
+          "name": "Count",
+          "description": "How many titles (1–50)"
+        }
+      }
+    }
+  }
+}

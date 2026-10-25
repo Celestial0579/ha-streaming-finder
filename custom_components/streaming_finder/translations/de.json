@@ -1,0 +1,76 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Streaming-Finder einrichten",
+        "description": "Land (zwei Buchstaben, z. B. DE) und Sprache für die Titel. Der TMDB-Schlüssel ist für „Wo läuft …?“ nötig und für die Anime-Verfügbarkeit im Land; ohne ihn liefert die Anime-Season die Plattformen weltweit laut AniList. Den Schlüssel kannst du später unter „Konfigurieren“ nachtragen.",
+        "data": {
+          "land": "Land",
+          "sprache": "Sprache",
+          "tmdb_token": "TMDB-Schlüssel (API Read Access Token)"
+        }
+      }
+    },
+    "error": {
+      "land_ungueltig": "Bitte einen zweistelligen Ländercode angeben (z. B. DE).",
+      "tmdb_ungueltig": "TMDB lehnt den Schlüssel ab.",
+      "tmdb_nicht_erreichbar": "TMDB ist nicht erreichbar."
+    },
+    "abort": {
+      "single_instance_allowed": "Streaming-Finder ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "TMDB-Schlüssel",
+        "description": "Leer lassen, um ohne TMDB zu arbeiten.",
+        "data": {
+          "tmdb_token": "TMDB-Schlüssel (API Read Access Token)"
+        }
+      }
+    },
+    "error": {
+      "tmdb_ungueltig": "TMDB lehnt den Schlüssel ab.",
+      "tmdb_nicht_erreichbar": "TMDB ist nicht erreichbar."
+    }
+  },
+  "services": {
+    "wo_laeuft": {
+      "name": "Wo läuft …?",
+      "description": "Bei welchen Streamingdiensten eine Serie oder ein Film im eingestellten Land läuft (Abo, kostenlos, mit Werbung, leihen, kaufen).",
+      "fields": {
+        "titel": {
+          "name": "Titel",
+          "description": "Name der Serie oder des Films"
+        },
+        "art": {
+          "name": "Art",
+          "description": "serie, film oder egal"
+        },
+        "jahr": {
+          "name": "Jahr",
+          "description": "Erscheinungsjahr, falls mehrdeutig"
+        }
+      }
+    },
+    "anime_saison": {
+      "name": "Anime-Season",
+      "description": "Die beliebtesten Animes einer Season mit Status, nächster Folge und Plattformen.",
+      "fields": {
+        "saison": {
+          "name": "Season",
+          "description": "Winter, Frühling, Sommer oder Herbst; leer = aktuelle"
+        },
+        "jahr": {
+          "name": "Jahr",
+          "description": "leer = aktuelles Jahr"
+        },
+        "anzahl": {
+          "name": "Anzahl",
+          "description": "Wie viele Titel (1–50)"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,40 @@
+wo_laeuft:
+  fields:
+    titel:
+      required: true
+      example: "The Boys"
+      selector:
+        text:
+    art:
+      default: egal
+      selector:
+        select:
+          options:
+            - serie
+            - film
+            - egal
+    jahr:
+      selector:
+        number:
+          min: 1900
+          max: 2100
+          mode: box
+anime_saison:
+  fields:
+    saison:
+      example: "Herbst"
+      selector:
+        text:
+    jahr:
+      selector:
+        number:
+          min: 1960
+          max: 2100
+          mode: box
+    anzahl:
+      default: 15
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: box
