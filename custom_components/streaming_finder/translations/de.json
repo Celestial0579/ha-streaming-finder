@@ -109,6 +109,11 @@
       "merkliste": {
         "name": "Merkliste"
       }
+    },
+    "calendar": {
+      "termine": {
+        "name": "Merkliste-Termine"
+      }
     }
   }
 }

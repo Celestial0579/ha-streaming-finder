@@ -18,6 +18,8 @@ DIENST_ANIME_SAISON = "anime_saison"
 DIENST_MERKLISTE = "merkliste"
 
 MERKLISTE_STUNDEN = 6
+TERMINE_TAGE_ZURUECK = 14
+FILM_ARTEN = {3: "Kinostart", 4: "Digital", 5: "DVD/Blu-ray", 6: "im Fernsehen"}
 MERKLISTE_MAX_SEITEN = 10
 
 SAISONS = {

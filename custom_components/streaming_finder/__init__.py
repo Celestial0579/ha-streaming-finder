@@ -15,7 +15,7 @@ from .const import CONF_KONTO_TOKEN, DIENST_ANIME_SAISON, DIENST_MERKLISTE, DIEN
 from .finder import Finder
 from .merkliste import MerklisteKoordinator
 
-PLATFORMS = [Platform.TODO]
+PLATFORMS = [Platform.CALENDAR, Platform.TODO]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 

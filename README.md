@@ -26,6 +26,8 @@ dort „Genehmigen“, zurück und „Senden“ – dein Passwort sieht Home Ass
   **abhaken oder löschen** nimmt einen Titel von der TMDB-Merkliste, **hinzufügen** sucht den Titel bei TMDB und setzt
   den besten Treffer darauf – auch per Sprachassistent („Setz The Boys auf meine Merkliste“)
 - die Aktion `streaming_finder.merkliste` (Antwort mit allen Einträgen und Angeboten)
+- den Kalender **Merkliste-Termine**: anstehende Folgen der laufenden Staffel (Serien) und Starttermine im Land
+  (Filme: Kino, digital, DVD/Blu-ray) – ohne eigenen ICS-Feed, direkt aus der Merkliste berechnet
 
 **Konfigurieren › TMDB-Konto trennen** entfernt die Merkliste wieder aus Home Assistant.
 

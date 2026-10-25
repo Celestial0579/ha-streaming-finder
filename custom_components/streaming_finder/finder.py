@@ -65,6 +65,9 @@ class Finder:
         schluessel = pfad + "|" + "&".join(f"{k}={v}" for k, v in sorted(parameter.items()))
         return await self._gemerkt(schluessel, dauer, lambda: quellen.tmdb(sitzung, self.token, pfad, parameter))
 
+    async def tmdb_lesen(self, pfad: str, stunden: float) -> dict[str, Any]:
+        return await self._tmdb(pfad, {"language": self.sprache}, stunden * STUNDE)
+
     async def angebote(self, art: str, tmdb_id: int) -> dict[str, list[str]] | None:
         daten = await self._tmdb(f"/{art}/{tmdb_id}/watch/providers", {}, 12 * STUNDE)
         return quellen.anbieter(daten, self.land)

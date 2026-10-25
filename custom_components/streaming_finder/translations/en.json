@@ -109,6 +109,11 @@
       "merkliste": {
         "name": "Watchlist"
       }
+    },
+    "calendar": {
+      "termine": {
+        "name": "Watchlist dates"
+      }
     }
   }
 }

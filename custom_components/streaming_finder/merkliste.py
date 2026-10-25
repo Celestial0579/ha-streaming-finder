@@ -15,10 +15,31 @@ from . import quellen
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.intent import IntentHandleError
 
-from .const import CONF_KONTO_ID, CONF_KONTO_SITZUNG, CONF_KONTO_TOKEN, CONF_KONTO_V3, DOMAIN, MERKLISTE_MAX_SEITEN, MERKLISTE_STUNDEN
+from datetime import date
+
+from homeassistant.util import dt as dt_util
+
+from .const import (
+    CONF_KONTO_ID,
+    CONF_KONTO_SITZUNG,
+    CONF_KONTO_TOKEN,
+    CONF_KONTO_V3,
+    DOMAIN,
+    FILM_ARTEN,
+    MERKLISTE_MAX_SEITEN,
+    MERKLISTE_STUNDEN,
+    TERMINE_TAGE_ZURUECK,
+)
 from .finder import Finder
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _datum(text: str | None) -> date | None:
+    try:
+        return date.fromisoformat(str(text)[:10]) if text else None
+    except ValueError:
+        return None
 
 
 def angebot_text(angebote: dict[str, list[str]] | None) -> str:
@@ -45,6 +66,7 @@ class MerklisteKoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             update_interval=timedelta(hours=MERKLISTE_STUNDEN),
         )
         self.finder = finder
+        self.termine: list[dict[str, Any]] = []
 
     async def _async_update_data(self) -> list[dict[str, Any]]:
         optionen = self.config_entry.options
@@ -70,7 +92,47 @@ class MerklisteKoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                     )
         except quellen.QuellenFehler as err:
             raise UpdateFailed(str(err)) from err
+        if self.finder.token:
+            try:
+                self.termine = await self._termine(ergebnis)
+            except quellen.QuellenFehler as err:
+                _LOGGER.warning("Termine der Merkliste nicht geladen: %s", err)
         return ergebnis
+
+    async def _termine(self, liste: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Anstehende Folgen (Serien) und Starttermine im Land (Filme)."""
+        heute = dt_util.now().date()
+        ab = heute.toordinal() - TERMINE_TAGE_ZURUECK
+        termine: list[dict[str, Any]] = []
+        for e in liste:
+            art, _, kennung = e["id"].partition("-")
+            wo = e["wo"]
+            if art == "tv":
+                serie = await self.finder.tmdb_lesen(f"/tv/{kennung}", 12)
+                naechste = serie.get("next_episode_to_air") or {}
+                folgen: list[dict[str, Any]] = []
+                if naechste.get("season_number") is not None:
+                    staffel = await self.finder.tmdb_lesen(f"/tv/{kennung}/season/{naechste['season_number']}", 12)
+                    folgen = staffel.get("episodes") or []
+                elif serie.get("last_episode_to_air"):
+                    folgen = [serie["last_episode_to_air"]]
+                for f in folgen:
+                    datum = _datum(f.get("air_date"))
+                    if datum and datum.toordinal() >= ab:
+                        nummer = f"S{int(f.get('season_number') or 0):02d}E{int(f.get('episode_number') or 0):02d}"
+                        name = f" „{f['name']}“" if f.get("name") and not str(f["name"]).lower().startswith(("episode", "folge")) else ""
+                        termine.append({"uid": f"tv-{kennung}-{nummer}", "datum": datum, "titel": f"{e['titel']} – {nummer}{name}", "beschreibung": f"Neue Folge · {wo}"})
+            else:
+                daten = await self.finder.tmdb_lesen(f"/movie/{kennung}/release_dates", 24)
+                land = next((r for r in daten.get("results") or [] if r.get("iso_3166_1") == self.finder.land), None)
+                gesehen: set[tuple[date, str]] = set()
+                for r in (land or {}).get("release_dates") or []:
+                    datum = _datum(r.get("release_date"))
+                    was = FILM_ARTEN.get(r.get("type"))
+                    if datum and was and datum.toordinal() >= ab and (datum, was) not in gesehen:
+                        gesehen.add((datum, was))
+                        termine.append({"uid": f"movie-{kennung}-{r.get('type')}-{datum}", "datum": datum, "titel": f"{e['titel']} – {was}", "beschreibung": f"Film · {wo}"})
+        return sorted(termine, key=lambda t: (t["datum"], t["titel"]))
 
     # ------------------------------------------------------------ Ändern
     async def _setzen(self, art: str, tmdb_id: int, merken: bool) -> None:
