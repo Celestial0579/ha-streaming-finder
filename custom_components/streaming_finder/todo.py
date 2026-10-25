@@ -43,8 +43,8 @@ class MerklisteListe(CoordinatorEntity[MerklisteKoordinator], TodoListEntity):
         return [
             TodoItem(
                 uid=e["id"],
-                summary=f"{e['titel']} ({e['jahr']})" if e.get("jahr") else e["titel"],
-                description=f"{e['art']} · {e['wo']}",
+                summary=e["titel"],
+                description=" · ".join(str(x) for x in (e["art"], e.get("jahr"), e["wo"]) if x),
                 status=TodoItemStatus.NEEDS_ACTION,
             )
             for e in self.coordinator.data or []
