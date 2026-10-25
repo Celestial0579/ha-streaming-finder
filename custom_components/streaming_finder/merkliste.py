@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from . import quellen
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.intent import IntentHandleError
 
 from .const import CONF_KONTO_ID, CONF_KONTO_SITZUNG, CONF_KONTO_TOKEN, CONF_KONTO_V3, DOMAIN, MERKLISTE_MAX_SEITEN, MERKLISTE_STUNDEN
 from .finder import Finder
@@ -100,7 +101,8 @@ class MerklisteKoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         kandidaten = [e for e in suche.get("results") or [] if e.get("media_type") in ("tv", "movie")]
         treffer = (quellen.bester_treffer(text, kandidaten) or [None])[0]
         if treffer is None:
-            raise HomeAssistantError(f"Bei TMDB nichts zu „{text}“ gefunden.")
+            # IntentHandleError statt HomeAssistantError: nur so erreicht der Text auch den Sprachassistenten
+            raise IntentHandleError(f"Bei TMDB nichts zu „{text}“ gefunden.")
         name = str(treffer.get("name") or treffer.get("title"))
         schon_da = any(e["id"] == f"{treffer['media_type']}-{treffer['id']}" for e in self.data or [])
         if not schon_da and self.config_entry.options.get(CONF_KONTO_SITZUNG):
@@ -112,7 +114,7 @@ class MerklisteKoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             except quellen.QuellenFehler:
                 schon_da = False
         if schon_da:
-            raise HomeAssistantError(f"„{name}“ steht schon auf deiner Merkliste.")
+            raise IntentHandleError(f"„{name}“ steht schon auf deiner Merkliste.")
         await self._setzen(treffer["media_type"], treffer["id"], True)
         await self.async_request_refresh()
         return str(treffer.get("name") or treffer.get("title"))
