@@ -54,7 +54,8 @@
     },
     "abort": {
       "erst_schluessel": "Please enter the TMDB key first.",
-      "tmdb_nicht_erreichbar": "TMDB is unreachable."
+      "tmdb_nicht_erreichbar": "TMDB is unreachable.",
+      "erst_trennen": "Disconnect the TMDB account first (this revokes the old access at TMDB), then connect again."
     }
   },
   "services": {

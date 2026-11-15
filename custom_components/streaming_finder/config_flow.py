@@ -87,9 +87,10 @@ class StreamingFinderOptionsFlow(OptionsFlow):
         return lese_token(self.config_entry)
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        punkte = ["schluessel", "konto"]
-        if self.config_entry.options.get(CONF_KONTO_TOKEN):
-            punkte.append("trennen")
+        # Verbunden: nur „trennen“. Neu verbinden ohne Trennen ließe die alte Sitzung bei TMDB gültig,
+        # und Home Assistant könnte sie danach nicht mehr widerrufen (GHSA-x2rg-wgwm-x389).
+        verbunden = bool(self.config_entry.options.get(CONF_KONTO_TOKEN))
+        punkte = ["schluessel", "trennen" if verbunden else "konto"]
         return self.async_show_menu(step_id="init", menu_options=punkte)
 
     async def async_step_schluessel(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
@@ -108,6 +109,8 @@ class StreamingFinderOptionsFlow(OptionsFlow):
         lese = self._lese_token()
         if not lese:
             return self.async_abort(reason="erst_schluessel")
+        if self._anfrage is None and self.config_entry.options.get(CONF_KONTO_TOKEN):
+            return self.async_abort(reason="erst_trennen")
         sitzung = async_get_clientsession(self.hass)
         fehler: dict[str, str] = {}
         if user_input is not None and self._anfrage:
@@ -117,6 +120,10 @@ class StreamingFinderOptionsFlow(OptionsFlow):
             except quellen.QuellenFehler:
                 fehler["base"] = "nicht_freigegeben"
             else:
+                if self.config_entry.options.get(CONF_KONTO_TOKEN):
+                    # Inzwischen anderswo verbunden: die eben erzeugten Zugänge nicht verwaist lassen.
+                    await quellen.zugang_widerrufen(sitzung, lese, sitzungs_id, konto_token)
+                    return self.async_abort(reason="erst_trennen")
                 return self.async_create_entry(
                     data={
                         **self.config_entry.options,

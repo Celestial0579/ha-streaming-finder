@@ -65,3 +65,61 @@ async def test_entfernen_widerruft(hass: HomeAssistant) -> None:
     with patch.object(quellen, "zugang_widerrufen", widerruf):
         await hass.config_entries.async_remove(eintrag.entry_id)
     widerruf.assert_awaited_once()
+
+
+async def test_verbunden_bietet_nur_trennen(hass: HomeAssistant) -> None:
+    """GHSA-x2rg-wgwm-x389: Neu verbinden ohne Trennen ließe die alte Sitzung bei TMDB gültig."""
+    eintrag = MockConfigEntry(domain=DOMAIN, data={"land": "DE"}, options=KONTO)
+    eintrag.add_to_hass(hass)
+    ergebnis = await hass.config_entries.options.async_init(eintrag.entry_id)
+    assert ergebnis["menu_options"] == ["schluessel", "trennen"]
+    eintrag2 = MockConfigEntry(domain=DOMAIN, data={"land": "AT"}, options={"tmdb_token": "x" * 50})
+    eintrag2.add_to_hass(hass)
+    ergebnis = await hass.config_entries.options.async_init(eintrag2.entry_id)
+    assert ergebnis["menu_options"] == ["schluessel", "konto"]
+
+
+async def _bis_konto(hass: HomeAssistant, eintrag: MockConfigEntry) -> str:
+    ergebnis = await hass.config_entries.options.async_init(eintrag.entry_id)
+    ergebnis = await hass.config_entries.options.async_configure(ergebnis["flow_id"], {"next_step_id": "konto"})
+    assert ergebnis["step_id"] == "konto"
+    return ergebnis["flow_id"]
+
+
+async def test_verbinden_ohne_bestehende_verbindung(hass: HomeAssistant) -> None:
+    eintrag = MockConfigEntry(domain=DOMAIN, data={"land": "DE"}, options={"tmdb_token": "x" * 50})
+    eintrag.add_to_hass(hass)
+    widerruf = AsyncMock(return_value=True)
+    with (
+        patch("custom_components.streaming_finder.async_setup_entry", return_value=True),
+        patch.object(quellen, "freigabe_anfordern", AsyncMock(return_value="anfrage")),
+        patch.object(quellen, "freigabe_abholen", AsyncMock(return_value=("neu-konto", "2"))),
+        patch.object(quellen, "sitzung_aus_konto_token", AsyncMock(return_value=("neu-sitzung", 8))),
+        patch.object(quellen, "zugang_widerrufen", widerruf),
+    ):
+        flow = await _bis_konto(hass, eintrag)
+        ergebnis = await hass.config_entries.options.async_configure(flow, {})
+    assert ergebnis["type"] is FlowResultType.CREATE_ENTRY
+    assert eintrag.options[CONF_KONTO_SITZUNG] == "neu-sitzung"
+    widerruf.assert_not_awaited()
+
+
+async def test_inzwischen_verbunden_widerruft_neue_zugaenge(hass: HomeAssistant) -> None:
+    """Wurde während des Dialogs anderswo verbunden, bleiben weder alte noch neue Zugänge verwaist."""
+    eintrag = MockConfigEntry(domain=DOMAIN, data={"land": "DE"}, options={"tmdb_token": "x" * 50})
+    eintrag.add_to_hass(hass)
+    widerruf = AsyncMock(return_value=True)
+    with (
+        patch("custom_components.streaming_finder.async_setup_entry", return_value=True),
+        patch.object(quellen, "freigabe_anfordern", AsyncMock(return_value="anfrage")),
+        patch.object(quellen, "freigabe_abholen", AsyncMock(return_value=("neu-konto", "2"))),
+        patch.object(quellen, "sitzung_aus_konto_token", AsyncMock(return_value=("neu-sitzung", 8))),
+        patch.object(quellen, "zugang_widerrufen", widerruf),
+    ):
+        flow = await _bis_konto(hass, eintrag)
+        hass.config_entries.async_update_entry(eintrag, options=KONTO)
+        ergebnis = await hass.config_entries.options.async_configure(flow, {})
+    assert ergebnis["type"] is FlowResultType.ABORT and ergebnis["reason"] == "erst_trennen"
+    widerruf.assert_awaited_once()
+    assert widerruf.await_args.args[2:] == ("neu-sitzung", "neu-konto")
+    assert eintrag.options == KONTO  # die bestehende Verbindung bleibt bekannt und widerrufbar
