@@ -38,7 +38,8 @@ dort „Genehmigen“, zurück und „Senden“ – dein Passwort sieht Home Ass
 bei TMDB (Sitzung und Konto-Token); ebenso beim Entfernen der Integration. Gelingt der Widerruf nicht, sagt der Dialog
 das, und die Freigabe ist in den Kontoeinstellungen bei TMDB selbst zu entziehen. Zum Neuverbinden (etwa nach einer
 weitergegebenen Sitzungskennung) erst trennen, dann neu verbinden; solange ein Konto verbunden ist, bietet der Dialog
-nur „trennen“ an.
+nur „trennen“ an. Auch der TMDB-Schlüssel lässt sich nur ohne verbundenes Konto ändern oder
+leeren, weil der Widerruf den Schlüssel braucht, mit dem verbunden wurde.
 
 ## Datenquellen
 

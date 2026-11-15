@@ -50,7 +50,8 @@
       "tmdb_ungueltig": "TMDB rejected the key.",
       "tmdb_nicht_erreichbar": "TMDB is unreachable.",
       "nicht_freigegeben": "TMDB reports no approval yet – please approve on the TMDB page first.",
-      "widerruf_gescheitert": "The access could not be revoked at TMDB. Please remove the approval in your TMDB account settings, then press “Submit” again; the watchlist is then disconnected in Home Assistant."
+      "widerruf_gescheitert": "The access could not be revoked at TMDB. Please remove the approval in your TMDB account settings, then press “Submit” again; the watchlist is then disconnected in Home Assistant.",
+      "schluessel_verbunden": "Disconnect the TMDB account first: the access can only be revoked with the key it was connected with."
     },
     "abort": {
       "erst_schluessel": "Please enter the TMDB key first.",
