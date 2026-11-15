@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 import aiohttp
 
-USER_AGENT = "HomeAssistant-streaming_finder/0.1 (+https://github.com/Celestial0579/ha-streaming-finder)"
+# Wird beim Import gelesen (Home Assistant importiert eigene Integrationen im Executor).
+FASSUNG = json.loads(Path(__file__).with_name("manifest.json").read_text(encoding="utf-8"))["version"]
+USER_AGENT = f"HomeAssistant-streaming_finder/{FASSUNG} (+https://github.com/Celestial0579/ha-streaming-finder)"
 _ZEIT = aiohttp.ClientTimeout(total=20)
 
 ANILIST_URL = "https://graphql.anilist.co"
@@ -36,6 +40,29 @@ class QuellenFehler(Exception):
     """Ein Dienst hat nicht wie erwartet geantwortet."""
 
 
+def fehlertext(err: BaseException) -> str:
+    """Kurzbeschreibung eines Fehlers OHNE dessen Text.
+
+    Der Text einer aiohttp-Ausnahme enthält oft die ganze Adresse samt Parametern, also
+    den TMDB-Schlüssel (api_key) und die Sitzungskennung (session_id). Fehlermeldungen
+    landen in der Oberfläche, bei Automationen und im Protokoll; deshalb nur Art und Status.
+    """
+    if isinstance(err, aiohttp.ClientResponseError):
+        return f"HTTP {err.status}" if err.status else type(err).__name__
+    if isinstance(err, TimeoutError):
+        return "Zeitüberschreitung"
+    if isinstance(err, ValueError):
+        return "Antwort ist kein JSON"
+    return type(err).__name__
+
+
+def objekt(daten: Any, dienst: str) -> dict[str, Any]:
+    """Die Antwort muss ein JSON-Objekt sein."""
+    if not isinstance(daten, dict):
+        raise QuellenFehler(f"{dienst}: unerwartete Antwort")
+    return daten
+
+
 async def anilist_saison(sitzung: aiohttp.ClientSession, saison: str, jahr: int, anzahl: int) -> list[dict[str, Any]]:
     try:
         async with sitzung.post(
@@ -50,10 +77,18 @@ async def anilist_saison(sitzung: aiohttp.ClientSession, saison: str, jahr: int,
                 raise QuellenFehler(f"AniList: HTTP {antwort.status}")
             daten = await antwort.json()
     except (aiohttp.ClientError, TimeoutError, ValueError) as err:
-        raise QuellenFehler(f"AniList nicht erreichbar: {err}") from err
+        raise QuellenFehler(f"AniList nicht erreichbar ({fehlertext(err)})") from err
+    daten = objekt(daten, "AniList")
     if daten.get("errors"):
-        raise QuellenFehler(f"AniList: {daten['errors'][0].get('message')}")
-    return daten["data"]["Page"]["media"]
+        fehler = daten["errors"][0] if isinstance(daten["errors"], list) and daten["errors"] else {}
+        raise QuellenFehler(f"AniList: {str(fehler.get('message') if isinstance(fehler, dict) else fehler)[:200]}")
+    try:
+        liste = daten["data"]["Page"]["media"]
+    except (KeyError, TypeError) as err:
+        raise QuellenFehler("AniList: unerwartete Antwort") from err
+    if not isinstance(liste, list):
+        raise QuellenFehler("AniList: unerwartete Antwort")
+    return [m for m in liste if isinstance(m, dict) and isinstance(m.get("title"), dict)]
 
 
 def _tmdb_kopf(token: str) -> tuple[dict[str, str], dict[str, str]]:
@@ -76,17 +111,23 @@ async def tmdb(sitzung: aiohttp.ClientSession, token: str, pfad: str, parameter:
                 raise QuellenFehler("TMDB: zu viele Anfragen, bitte später erneut")
             if antwort.status != 200:
                 raise QuellenFehler(f"TMDB: HTTP {antwort.status}")
-            return await antwort.json()
+            return objekt(await antwort.json(), "TMDB")
     except (aiohttp.ClientError, TimeoutError, ValueError) as err:
-        raise QuellenFehler(f"TMDB nicht erreichbar: {err}") from err
+        raise QuellenFehler(f"TMDB nicht erreichbar ({fehlertext(err)})") from err
 
 
 def anbieter(ergebnis: dict[str, Any], land: str) -> dict[str, list[str]] | None:
     """Streaming-Angebote eines Titels im Land aus /watch/providers."""
-    daten = (ergebnis.get("results") or {}).get(land)
-    if not daten:
+    ergebnisse = ergebnis.get("results")
+    daten = ergebnisse.get(land) if isinstance(ergebnisse, dict) else None
+    if not isinstance(daten, dict) or not daten:
         return None
-    namen = lambda schluessel: [a["provider_name"] for a in sorted(daten.get(schluessel) or [], key=lambda a: a.get("display_priority", 99))]
+
+    def namen(schluessel: str) -> list[str]:
+        liste = [a for a in daten.get(schluessel) or [] if isinstance(a, dict) and a.get("provider_name")]
+        rang = lambda a: a.get("display_priority") if isinstance(a.get("display_priority"), int) else 99
+        return [str(a["provider_name"]) for a in sorted(liste, key=rang)]
+
     return {
         "abo": namen("flatrate"),
         "kostenlos": namen("free"),
@@ -106,16 +147,15 @@ async def tmdb4(
         async with sitzung.request(
             methode, f"{TMDB4_URL}{pfad}", json=inhalt, params=parameter or {}, headers=kopf, timeout=_ZEIT
         ) as antwort:
-            daten = await antwort.json(content_type=None)
             if antwort.status == 401:
-                raise QuellenFehler("TMDB: Zugriff verweigert" + (f" ({daten.get('status_message')})" if isinstance(daten, dict) else ""))
+                raise QuellenFehler("TMDB: Zugriff verweigert – TMDB-Konto unter „Konfigurieren“ neu verbinden")
             if antwort.status == 429:
                 raise QuellenFehler("TMDB: zu viele Anfragen, bitte später erneut")
             if antwort.status >= 400:
                 raise QuellenFehler(f"TMDB: HTTP {antwort.status}")
-            return daten
+            return objekt(await antwort.json(content_type=None), "TMDB")
     except (aiohttp.ClientError, TimeoutError, ValueError) as err:
-        raise QuellenFehler(f"TMDB nicht erreichbar: {err}") from err
+        raise QuellenFehler(f"TMDB nicht erreichbar ({fehlertext(err)})") from err
 
 
 async def freigabe_anfordern(sitzung: aiohttp.ClientSession, lese_token: str) -> str:
@@ -145,8 +185,12 @@ async def merkliste(
             sitzung, konto_token, "GET", f"/account/{konto_id}/{art}/watchlist",
             parameter={"page": seite, "language": sprache, "sort_by": "created_at.desc"},
         )
-        eintraege.extend(daten.get("results") or [])
-        if seite >= int(daten.get("total_pages") or 1):
+        eintraege.extend(e for e in daten.get("results") or [] if isinstance(e, dict) and "id" in e)
+        try:
+            seiten = int(daten.get("total_pages") or 1)
+        except (TypeError, ValueError):
+            seiten = 1
+        if seite >= seiten:
             break
         seite += 1
     return eintraege
@@ -161,13 +205,11 @@ async def tmdb_schreiben(
         async with sitzung.post(
             f"{TMDB_URL}{pfad}", json=inhalt, params={**(parameter or {}), **schluessel}, headers=kopf, timeout=_ZEIT
         ) as antwort:
-            daten = await antwort.json(content_type=None)
             if antwort.status >= 400:
-                text = daten.get("status_message") if isinstance(daten, dict) else None
-                raise QuellenFehler(f"TMDB: HTTP {antwort.status}" + (f" ({text})" if text else ""))
-            return daten
+                raise QuellenFehler(f"TMDB: HTTP {antwort.status}")
+            return objekt(await antwort.json(content_type=None), "TMDB")
     except (aiohttp.ClientError, TimeoutError, ValueError) as err:
-        raise QuellenFehler(f"TMDB nicht erreichbar: {err}") from err
+        raise QuellenFehler(f"TMDB nicht erreichbar ({fehlertext(err)})") from err
 
 
 async def sitzung_aus_konto_token(sitzung: aiohttp.ClientSession, lese_token: str, konto_token: str) -> tuple[str, int]:
@@ -177,7 +219,10 @@ async def sitzung_aus_konto_token(sitzung: aiohttp.ClientSession, lese_token: st
     if not sitzungs_id:
         raise QuellenFehler("TMDB: keine Sitzung erhalten")
     konto = await tmdb(sitzung, lese_token, "/account", {"session_id": sitzungs_id})
-    return sitzungs_id, int(konto["id"])
+    try:
+        return sitzungs_id, int(konto["id"])
+    except (KeyError, TypeError, ValueError) as err:
+        raise QuellenFehler("TMDB: unerwartete Antwort") from err
 
 
 async def merkliste_setzen(
