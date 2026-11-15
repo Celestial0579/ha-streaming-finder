@@ -101,16 +101,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: StreamingFinderConfigEnt
     finder = Finder(hass, entry)
     if entry.options.get(CONF_KONTO_TOKEN):
         finder.merkliste = MerklisteKoordinator(hass, entry, finder)
-        # Kein first_refresh: Eine gestörte Merkliste darf „Wo läuft …?“ und die Anime-Season
-        # nicht mitnehmen. Liste und Kalender sind dann nicht verfügbar und erholen sich beim
-        # nächsten Abruf.
-        await finder.merkliste.async_refresh()
-        if not finder.merkliste.last_update_success:
-            _LOGGER.warning("Merkliste nicht geladen: %s", finder.merkliste.last_exception)
+        # Kein first_refresh und kein Warten: Eine gestörte oder lange Merkliste (bis 200 Titel,
+        # je drei Abrufe) darf weder „Wo läuft …?“ noch den Start von Home Assistant aufhalten.
+        # Liste und Kalender füllen sich, sobald der erste Abgleich im Hintergrund fertig ist.
+        entry.async_create_background_task(hass, _merkliste_laden(finder.merkliste), f"{DOMAIN}_merkliste_start")
     entry.runtime_data = finder
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_optionen_geaendert))
     return True
+
+
+async def _merkliste_laden(merkliste: MerklisteKoordinator) -> None:
+    await merkliste.async_refresh()
+    if not merkliste.last_update_success:
+        _LOGGER.warning("Merkliste nicht geladen: %s", merkliste.last_exception)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: StreamingFinderConfigEntry) -> bool:
