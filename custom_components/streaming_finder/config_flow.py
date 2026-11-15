@@ -97,7 +97,10 @@ class StreamingFinderOptionsFlow(OptionsFlow):
         fehler: dict[str, str] = {}
         if user_input is not None:
             token = str(user_input.get(CONF_TMDB_TOKEN) or "").strip()
-            if problem := await _pruefen(self, token):
+            if self.config_entry.options.get(CONF_KONTO_TOKEN) and token != self._lese_token():
+                # Widerrufen geht nur mit dem Schlüssel, mit dem verbunden wurde (GHSA-f7x2-p725-fc44).
+                fehler[CONF_TMDB_TOKEN] = "schluessel_verbunden"
+            elif problem := await _pruefen(self, token):
                 fehler[CONF_TMDB_TOKEN] = problem
             else:
                 return self.async_create_entry(data={**self.config_entry.options, CONF_TMDB_TOKEN: token})

@@ -262,6 +262,8 @@ async def zugang_widerrufen(
     Nur aus den Optionen löschen reicht nicht: Eine durchgesickerte Sitzungskennung bliebe
     bei TMDB gültig und erlaubte weiter Änderungen an der Merkliste.
     """
+    if not lese_token and (sitzungs_id or konto_token):
+        return False  # ohne Schlüssel lehnt TMDB den Widerruf ab; nicht so tun, als ginge es
     ok = True
     if sitzungs_id:
         try:

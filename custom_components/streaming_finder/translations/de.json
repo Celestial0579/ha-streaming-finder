@@ -50,7 +50,8 @@
       "tmdb_ungueltig": "TMDB lehnt den Schlüssel ab.",
       "tmdb_nicht_erreichbar": "TMDB ist nicht erreichbar.",
       "nicht_freigegeben": "TMDB meldet noch keine Freigabe – bitte zuerst auf der TMDB-Seite genehmigen.",
-      "widerruf_gescheitert": "Der Zugang ließ sich bei TMDB nicht widerrufen. Bitte die Freigabe in den Kontoeinstellungen bei TMDB selbst entziehen und dann erneut „Senden“ drücken; die Merkliste wird dann in Home Assistant getrennt."
+      "widerruf_gescheitert": "Der Zugang ließ sich bei TMDB nicht widerrufen. Bitte die Freigabe in den Kontoeinstellungen bei TMDB selbst entziehen und dann erneut „Senden“ drücken; die Merkliste wird dann in Home Assistant getrennt.",
+      "schluessel_verbunden": "Bitte zuerst das TMDB-Konto trennen: Der Zugang lässt sich nur mit dem Schlüssel widerrufen, mit dem verbunden wurde."
     },
     "abort": {
       "erst_schluessel": "Bitte zuerst den TMDB-Schlüssel eintragen.",
