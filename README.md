@@ -34,7 +34,9 @@ dort „Genehmigen“, zurück und „Senden“ – dein Passwort sieht Home Ass
 - den Kalender **Merkliste-Termine**: anstehende Folgen der laufenden Staffel (Serien) und Starttermine im Land
   (Filme: Kino, digital, DVD/Blu-ray) – ohne eigenen ICS-Feed, direkt aus der Merkliste berechnet
 
-**Konfigurieren › TMDB-Konto trennen** entfernt die Merkliste wieder aus Home Assistant.
+**Konfigurieren › TMDB-Konto trennen** entfernt die Merkliste wieder aus Home Assistant und widerruft den Zugang
+bei TMDB (Sitzung und Konto-Token); ebenso beim Entfernen der Integration. Gelingt der Widerruf nicht, sagt der Dialog
+das, und die Freigabe ist in den Kontoeinstellungen bei TMDB selbst zu entziehen.
 
 ## Datenquellen
 

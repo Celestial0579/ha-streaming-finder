@@ -81,6 +81,7 @@ class StreamingFinderOptionsFlow(OptionsFlow):
 
     def __init__(self) -> None:
         self._anfrage: str | None = None
+        self._widerruf_gescheitert = False
 
     def _lese_token(self) -> str:
         return lese_token(self.config_entry)
@@ -138,8 +139,16 @@ class StreamingFinderOptionsFlow(OptionsFlow):
         )
 
     async def async_step_trennen(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        fehler: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(
-                data={k: v for k, v in self.config_entry.options.items() if k not in KONTO_SCHLUESSEL}
-            )
-        return self.async_show_form(step_id="trennen", data_schema=vol.Schema({}))
+            optionen = self.config_entry.options
+            # Erst bei TMDB widerrufen; ein zweites „Senden“ nach einem Fehlschlag trennt trotzdem.
+            if not self._widerruf_gescheitert and not await quellen.zugang_widerrufen(
+                async_get_clientsession(self.hass), self._lese_token(),
+                optionen.get(CONF_KONTO_SITZUNG), optionen.get(CONF_KONTO_TOKEN),
+            ):
+                self._widerruf_gescheitert = True
+                fehler["base"] = "widerruf_gescheitert"
+            else:
+                return self.async_create_entry(data={k: v for k, v in optionen.items() if k not in KONTO_SCHLUESSEL})
+        return self.async_show_form(step_id="trennen", data_schema=vol.Schema({}), errors=fehler)

@@ -197,13 +197,14 @@ async def merkliste(
 
 
 async def tmdb_schreiben(
-    sitzung: aiohttp.ClientSession, lese_token: str, pfad: str, inhalt: dict[str, Any], parameter: dict[str, Any] | None = None
+    sitzung: aiohttp.ClientSession, lese_token: str, pfad: str, inhalt: dict[str, Any], parameter: dict[str, Any] | None = None,
+    methode: str = "POST",
 ) -> dict[str, Any]:
-    """POST an die TMDB-API v3."""
+    """POST (oder DELETE) an die TMDB-API v3."""
     kopf, schluessel = _tmdb_kopf(lese_token)
     try:
-        async with sitzung.post(
-            f"{TMDB_URL}{pfad}", json=inhalt, params={**(parameter or {}), **schluessel}, headers=kopf, timeout=_ZEIT
+        async with sitzung.request(
+            methode, f"{TMDB_URL}{pfad}", json=inhalt, params={**(parameter or {}), **schluessel}, headers=kopf, timeout=_ZEIT
         ) as antwort:
             if antwort.status >= 400:
                 raise QuellenFehler(f"TMDB: HTTP {antwort.status}")
@@ -251,3 +252,25 @@ async def auf_merkliste(
     """Steht der Titel laut TMDB schon auf der Merkliste?"""
     daten = await tmdb(sitzung, lese_token, f"/{art}/{tmdb_id}/account_states", {"session_id": sitzungs_id})
     return bool(daten.get("watchlist"))
+
+
+async def zugang_widerrufen(
+    sitzung: aiohttp.ClientSession, lese_token: str, sitzungs_id: str | None, konto_token: str | None
+) -> bool:
+    """Sitzung (v3) und Konto-Token (v4) bei TMDB widerrufen. True, wenn beides gelang.
+
+    Nur aus den Optionen löschen reicht nicht: Eine durchgesickerte Sitzungskennung bliebe
+    bei TMDB gültig und erlaubte weiter Änderungen an der Merkliste.
+    """
+    ok = True
+    if sitzungs_id:
+        try:
+            await tmdb_schreiben(sitzung, lese_token, "/authentication/session", {"session_id": sitzungs_id}, methode="DELETE")
+        except QuellenFehler:
+            ok = False
+    if konto_token:
+        try:
+            await tmdb4(sitzung, lese_token, "DELETE", "/auth/access_token", {"access_token": konto_token})
+        except QuellenFehler:
+            ok = False
+    return ok
