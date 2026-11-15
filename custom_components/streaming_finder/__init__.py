@@ -11,9 +11,11 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
+    CONF_KONTO_SITZUNG,
     CONF_KONTO_TOKEN,
     DIENST_ANIME_SAISON,
     DIENST_MERKLISTE,
@@ -21,7 +23,8 @@ from .const import (
     DIENST_WO_LAEUFT,
     DOMAIN,
 )
-from .finder import Finder
+from . import quellen
+from .finder import Finder, lese_token
 from .merkliste import MerklisteKoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -112,6 +115,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: StreamingFinderConfigEnt
 
 async def async_unload_entry(hass: HomeAssistant, entry: StreamingFinderConfigEntry) -> bool:
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: StreamingFinderConfigEntry) -> None:
+    """Beim Entfernen auch den Zugang bei TMDB widerrufen."""
+    if not entry.options.get(CONF_KONTO_TOKEN):
+        return
+    if not await quellen.zugang_widerrufen(
+        async_get_clientsession(hass), lese_token(entry), entry.options.get(CONF_KONTO_SITZUNG), entry.options.get(CONF_KONTO_TOKEN)
+    ):
+        _LOGGER.warning(
+            "TMDB-Zugang nicht widerrufen. Bitte die Freigabe in den Kontoeinstellungen bei TMDB selbst entziehen"
+        )
 
 
 async def _optionen_geaendert(hass: HomeAssistant, entry: StreamingFinderConfigEntry) -> None:
