@@ -27,6 +27,19 @@ WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samsta
 STUNDE = 3600
 
 
+def lese_token(entry: ConfigEntry) -> str:
+    """TMDB-Schlüssel: steht er in den Optionen, gilt er, auch wenn er leer ist (= ohne TMDB).
+
+    Nur ohne den Schlüssel in den Optionen gilt der aus der Ersteinrichtung.
+    """
+    if CONF_TMDB_TOKEN in entry.options:
+        return str(entry.options[CONF_TMDB_TOKEN] or "").strip()
+    return str(entry.data.get(CONF_TMDB_TOKEN) or "").strip()
+
+
+UNERWARTET = (KeyError, TypeError, AttributeError, ValueError, IndexError)
+
+
 class Finder:
     """Eine Instanz je Eintrag."""
 
@@ -35,10 +48,11 @@ class Finder:
         self.entry = entry
         self._speicher: dict[str, tuple[float, Any]] = {}
         self.merkliste = None
+        self._tmdb_gestoert = False
 
     @property
     def token(self) -> str:
-        return str(self.entry.options.get(CONF_TMDB_TOKEN) or self.entry.data.get(CONF_TMDB_TOKEN) or "").strip()
+        return lese_token(self.entry)
 
     @property
     def land(self) -> str:
@@ -85,7 +99,7 @@ class Finder:
         try:
             suche = await self._tmdb(pfad, parameter, 12 * STUNDE)
             treffer = []
-            for e in quellen.bester_treffer(titel, suche.get("results") or []):
+            for e in quellen.bester_treffer(titel, [r for r in suche.get("results") or [] if isinstance(r, dict) and "id" in r]):
                 typ = e.get("media_type") or ("tv" if art == "serie" else "movie")
                 if typ not in ("tv", "movie"):
                     continue
@@ -104,6 +118,8 @@ class Finder:
                     break
         except quellen.QuellenFehler as err:
             raise HomeAssistantError(str(err)) from err
+        except UNERWARTET as err:
+            raise HomeAssistantError("TMDB: unerwartete Antwort") from err
         return {"suche": titel, "land": self.land, "treffer": treffer, "quelle": "JustWatch über TMDB"}
 
     # ------------------------------------------------------------ Anime-Season
@@ -127,6 +143,7 @@ class Finder:
         except quellen.QuellenFehler as err:
             raise HomeAssistantError(str(err)) from err
         ergebnis = []
+        self._tmdb_gestoert = False
         for m in liste:
             titel = m["title"].get("english") or m["title"].get("romaji")
             eintrag: dict[str, Any] = {
@@ -137,19 +154,28 @@ class Finder:
                 "status": STATUS_DEUTSCH.get(m.get("status"), m.get("status")),
                 "genres": m.get("genres") or [],
                 "bewertung": m.get("averageScore"),
-                "plattformen_weltweit": sorted({l["site"] for l in m.get("externalLinks") or [] if l.get("type") == "STREAMING"}),
+                "plattformen_weltweit": sorted(
+                    {str(l["site"]) for l in m.get("externalLinks") or [] if isinstance(l, dict) and l.get("site") and l.get("type") == "STREAMING"}
+                ),
             }
-            if folge := m.get("nextAiringEpisode"):
+            folge = m.get("nextAiringEpisode")
+            if isinstance(folge, dict) and isinstance(folge.get("airingAt"), int):
                 zeit = dt_util.as_local(dt_util.utc_from_timestamp(folge["airingAt"]))
-                eintrag["naechste_folge"] = {"nummer": folge["episode"], "termin": f"{WOCHENTAGE[zeit.weekday()]}, {zeit.strftime('%d.%m. %H:%M')}"}
-            if self.token:
+                eintrag["naechste_folge"] = {"nummer": folge.get("episode"), "termin": f"{WOCHENTAGE[zeit.weekday()]}, {zeit.strftime('%d.%m. %H:%M')}"}
+            if self.token and not self._tmdb_gestoert:
                 eintrag["angebote_" + self.land.lower()] = await self._anime_angebote(m)
             ergebnis.append(eintrag)
+        if not self.token:
+            hinweis = f"Plattformen weltweit laut AniList; Verfügbarkeit in {self.land} kann abweichen"
+        elif self._tmdb_gestoert:
+            hinweis = f"TMDB nicht erreichbar; Verfügbarkeit in {self.land} fehlt ab dem ersten Fehler"
+        else:
+            hinweis = None
         return {
             "season": f"{SAISON_DEUTSCH[wert]} {jahr}",
             "anzahl": len(ergebnis),
             "animes": ergebnis,
-            "hinweis": None if self.token else f"Plattformen weltweit laut AniList; Verfügbarkeit in {self.land} kann abweichen",
+            "hinweis": hinweis,
         }
 
     async def _anime_angebote(self, m: dict[str, Any]) -> dict[str, list[str]] | None:
@@ -160,12 +186,11 @@ class Finder:
                 continue
             try:
                 suche = await self._tmdb(f"/search/{art}", {"query": name, "language": self.sprache}, 24 * STUNDE)
-            except quellen.QuellenFehler:
-                return None
-            for e in suche.get("results") or []:
-                if 16 in (e.get("genre_ids") or []):  # Animation
-                    try:
+                for e in suche.get("results") or []:
+                    if isinstance(e, dict) and 16 in (e.get("genre_ids") or []):  # Animation
                         return await self.angebote(art, e["id"])
-                    except quellen.QuellenFehler:
-                        return None
+            except (quellen.QuellenFehler, *UNERWARTET):
+                # Nach dem ersten Fehler fragt dieser Aufruf TMDB nicht mehr (Zeitgrenzen, Ratenlimit).
+                self._tmdb_gestoert = True
+                return None
         return None

@@ -125,11 +125,15 @@ class MerklisteKoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                     )
         except quellen.QuellenFehler as err:
             raise UpdateFailed(str(err)) from err
+        except (KeyError, TypeError, AttributeError, ValueError) as err:
+            raise UpdateFailed("TMDB: unerwartete Antwort") from err
         if self.finder.token:
             try:
                 self.termine = await self._termine(ergebnis)
             except quellen.QuellenFehler as err:
                 _LOGGER.warning("Termine der Merkliste nicht geladen: %s", err)
+            except (KeyError, TypeError, AttributeError, ValueError):
+                _LOGGER.warning("Termine der Merkliste nicht geladen: TMDB: unerwartete Antwort")
         return ergebnis
 
     async def _termine(self, liste: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -183,6 +187,8 @@ class MerklisteKoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
     async def async_entfernen(self, uid: str) -> None:
         art, _, kennung = uid.partition("-")
         await self._setzen(art, int(kennung), False)
+        # Auch die Termine des Titels gehen sofort, nicht erst beim nächsten Laden.
+        self.termine = [t for t in self.termine if not t["uid"].startswith(f"{uid}-")]
         self.async_set_updated_data([e for e in self.data or [] if e["id"] != uid])
 
     async def async_entfernen_titel(self, text: str) -> str:

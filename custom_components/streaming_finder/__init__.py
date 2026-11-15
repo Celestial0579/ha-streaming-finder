@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
@@ -21,6 +23,8 @@ from .const import (
 )
 from .finder import Finder
 from .merkliste import MerklisteKoordinator
+
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.CALENDAR, Platform.TODO]
 
@@ -94,7 +98,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: StreamingFinderConfigEnt
     finder = Finder(hass, entry)
     if entry.options.get(CONF_KONTO_TOKEN):
         finder.merkliste = MerklisteKoordinator(hass, entry, finder)
-        await finder.merkliste.async_config_entry_first_refresh()
+        # Kein first_refresh: Eine gestörte Merkliste darf „Wo läuft …?“ und die Anime-Season
+        # nicht mitnehmen. Liste und Kalender sind dann nicht verfügbar und erholen sich beim
+        # nächsten Abruf.
+        await finder.merkliste.async_refresh()
+        if not finder.merkliste.last_update_success:
+            _LOGGER.warning("Merkliste nicht geladen: %s", finder.merkliste.last_exception)
     entry.runtime_data = finder
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_optionen_geaendert))

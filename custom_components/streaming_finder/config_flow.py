@@ -12,6 +12,7 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from . import quellen
+from .finder import lese_token
 from .const import (
     CONF_KONTO_ID,
     CONF_KONTO_SITZUNG,
@@ -82,7 +83,7 @@ class StreamingFinderOptionsFlow(OptionsFlow):
         self._anfrage: str | None = None
 
     def _lese_token(self) -> str:
-        return str(self.config_entry.options.get(CONF_TMDB_TOKEN) or self.config_entry.data.get(CONF_TMDB_TOKEN) or "")
+        return lese_token(self.config_entry)
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         punkte = ["schluessel", "konto"]

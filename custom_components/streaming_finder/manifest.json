@@ -1,9 +1,8 @@
 {
   "domain": "streaming_finder",
   "name": "Streaming-Finder",
-  "codeowners": [
-    "@Celestial0579"
-  ],
+  "categories": ["media_entertainment.tv_streaming"],
+  "codeowners": ["@Celestial0579"],
   "config_flow": true,
   "documentation": "https://github.com/Celestial0579/ha-streaming-finder",
   "integration_type": "service",
@@ -11,5 +10,5 @@
   "issue_tracker": "https://github.com/Celestial0579/ha-streaming-finder/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.3.1"
+  "version": "0.3.2"
 }
