@@ -54,7 +54,8 @@
     },
     "abort": {
       "erst_schluessel": "Bitte zuerst den TMDB-Schlüssel eintragen.",
-      "tmdb_nicht_erreichbar": "TMDB ist nicht erreichbar."
+      "tmdb_nicht_erreichbar": "TMDB ist nicht erreichbar.",
+      "erst_trennen": "Bitte zuerst das TMDB-Konto trennen (das widerruft den alten Zugang bei TMDB), dann neu verbinden."
     }
   },
   "services": {

@@ -36,7 +36,9 @@ dort „Genehmigen“, zurück und „Senden“ – dein Passwort sieht Home Ass
 
 **Konfigurieren › TMDB-Konto trennen** entfernt die Merkliste wieder aus Home Assistant und widerruft den Zugang
 bei TMDB (Sitzung und Konto-Token); ebenso beim Entfernen der Integration. Gelingt der Widerruf nicht, sagt der Dialog
-das, und die Freigabe ist in den Kontoeinstellungen bei TMDB selbst zu entziehen.
+das, und die Freigabe ist in den Kontoeinstellungen bei TMDB selbst zu entziehen. Zum Neuverbinden (etwa nach einer
+weitergegebenen Sitzungskennung) erst trennen, dann neu verbinden; solange ein Konto verbunden ist, bietet der Dialog
+nur „trennen“ an.
 
 ## Datenquellen
 
