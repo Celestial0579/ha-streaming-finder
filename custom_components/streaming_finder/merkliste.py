@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Coroutine
 from datetime import timedelta
 import difflib
 import logging
 import re
-from typing import Any
+from typing import Any, TypeVar
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -35,6 +37,8 @@ from .const import (
 from .finder import Finder
 
 _LOGGER = logging.getLogger(__name__)
+T = TypeVar("T")
+GLEICHZEITIG = 4  # TMDB-Abrufe zur selben Zeit beim Abgleich der Merkliste
 
 
 def _datum(text: str | None) -> date | None:
@@ -107,12 +111,16 @@ class MerklisteKoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         ergebnis: list[dict[str, Any]] = []
         try:
             for art in ("tv", "movie"):
-                for e in await quellen.merkliste(
+                titel = await quellen.merkliste(
                     sitzung, optionen[CONF_KONTO_TOKEN], optionen[CONF_KONTO_ID], art,
                     self.finder.sprache, MERKLISTE_MAX_SEITEN,
-                ):
+                )
+                alle_angebote = await self._gebuendelt(
+                    [self.finder.angebote(art, e["id"]) for e in titel] if self.finder.token else []
+                )
+                for nummer, e in enumerate(titel):
                     datum = e.get("first_air_date") or e.get("release_date") or ""
-                    angebote = await self.finder.angebote(art, e["id"]) if self.finder.token else None
+                    angebote = alle_angebote[nummer] if self.finder.token else None
                     ergebnis.append(
                         {
                             "id": f"{art}-{e['id']}",
@@ -136,40 +144,64 @@ class MerklisteKoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                 _LOGGER.warning("Termine der Merkliste nicht geladen: TMDB: unerwartete Antwort")
         return ergebnis
 
+    @staticmethod
+    async def _gebuendelt(aufrufe: list[Coroutine[Any, Any, T]]) -> list[T]:
+        """Höchstens GLEICHZEITIG Abrufe zur selben Zeit; Reihenfolge bleibt, der erste Fehler bricht ab."""
+        schranke = asyncio.Semaphore(GLEICHZEITIG)
+
+        async def einer(aufruf: Coroutine[Any, Any, T]) -> T:
+            try:
+                async with schranke:
+                    return await aufruf
+            finally:
+                aufruf.close()  # nie gestartet (abgebrochen): ohne Warnung schließen
+
+        aufgaben = [asyncio.ensure_future(einer(a)) for a in aufrufe]
+        try:
+            return await asyncio.gather(*aufgaben)
+        finally:
+            for aufgabe in aufgaben:
+                aufgabe.cancel()
+
     async def _termine(self, liste: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Anstehende Folgen (Serien) und Starttermine im Land (Filme)."""
         heute = dt_util.now().date()
         ab = heute.toordinal() - TERMINE_TAGE_ZURUECK
         termine: list[dict[str, Any]] = []
-        for e in liste:
-            art, _, kennung = e["id"].partition("-")
-            wo = e["wo"]
-            if art == "tv":
-                serie = await self.finder.tmdb_lesen(f"/tv/{kennung}", 12)
-                naechste = serie.get("next_episode_to_air") or {}
-                folgen: list[dict[str, Any]] = []
-                if naechste.get("season_number") is not None:
-                    staffel = await self.finder.tmdb_lesen(f"/tv/{kennung}/season/{naechste['season_number']}", 12)
-                    folgen = staffel.get("episodes") or []
-                elif serie.get("last_episode_to_air"):
-                    folgen = [serie["last_episode_to_air"]]
-                for f in folgen:
-                    datum = _datum(f.get("air_date"))
-                    if datum and datum.toordinal() >= ab:
-                        nummer = f"S{int(f.get('season_number') or 0):02d}E{int(f.get('episode_number') or 0):02d}"
-                        name = f" „{f['name']}“" if f.get("name") and not str(f["name"]).lower().startswith(("episode", "folge")) else ""
-                        termine.append({"uid": f"tv-{kennung}-{nummer}", "datum": datum, "titel": f"{e['titel']} – {nummer}{name}", "beschreibung": f"Neue Folge · {wo}"})
-            else:
-                daten = await self.finder.tmdb_lesen(f"/movie/{kennung}/release_dates", 24)
-                land = next((r for r in daten.get("results") or [] if r.get("iso_3166_1") == self.finder.land), None)
-                gesehen: set[tuple[date, str]] = set()
-                for r in (land or {}).get("release_dates") or []:
-                    datum = _datum(r.get("release_date"))
-                    was = FILM_ARTEN.get(r.get("type"))
-                    if datum and was and datum.toordinal() >= ab and (datum, was) not in gesehen:
-                        gesehen.add((datum, was))
-                        termine.append({"uid": f"movie-{kennung}-{r.get('type')}-{datum}", "datum": datum, "titel": f"{e['titel']} – {was}", "beschreibung": f"Film · {wo}"})
+        for teil in await self._gebuendelt([self._termine_eines(e, ab) for e in liste]):
+            termine.extend(teil)
         return sorted(termine, key=lambda t: (t["datum"], t["titel"]))
+
+    async def _termine_eines(self, e: dict[str, Any], ab: int) -> list[dict[str, Any]]:
+        termine: list[dict[str, Any]] = []
+        art, _, kennung = e["id"].partition("-")
+        wo = e["wo"]
+        if art == "tv":
+            serie = await self.finder.tmdb_lesen(f"/tv/{kennung}", 12)
+            naechste = serie.get("next_episode_to_air") or {}
+            folgen: list[dict[str, Any]] = []
+            if naechste.get("season_number") is not None:
+                staffel = await self.finder.tmdb_lesen(f"/tv/{kennung}/season/{naechste['season_number']}", 12)
+                folgen = staffel.get("episodes") or []
+            elif serie.get("last_episode_to_air"):
+                folgen = [serie["last_episode_to_air"]]
+            for f in folgen:
+                datum = _datum(f.get("air_date"))
+                if datum and datum.toordinal() >= ab:
+                    nummer = f"S{int(f.get('season_number') or 0):02d}E{int(f.get('episode_number') or 0):02d}"
+                    name = f" „{f['name']}“" if f.get("name") and not str(f["name"]).lower().startswith(("episode", "folge")) else ""
+                    termine.append({"uid": f"tv-{kennung}-{nummer}", "datum": datum, "titel": f"{e['titel']} – {nummer}{name}", "beschreibung": f"Neue Folge · {wo}"})
+        else:
+            daten = await self.finder.tmdb_lesen(f"/movie/{kennung}/release_dates", 24)
+            land = next((r for r in daten.get("results") or [] if r.get("iso_3166_1") == self.finder.land), None)
+            gesehen: set[tuple[date, str]] = set()
+            for r in (land or {}).get("release_dates") or []:
+                datum = _datum(r.get("release_date"))
+                was = FILM_ARTEN.get(r.get("type"))
+                if datum and was and datum.toordinal() >= ab and (datum, was) not in gesehen:
+                    gesehen.add((datum, was))
+                    termine.append({"uid": f"movie-{kennung}-{r.get('type')}-{datum}", "datum": datum, "titel": f"{e['titel']} – {was}", "beschreibung": f"Film · {wo}"})
+        return termine
 
     # ------------------------------------------------------------ Ändern
     async def _setzen(self, art: str, tmdb_id: int, merken: bool) -> None:

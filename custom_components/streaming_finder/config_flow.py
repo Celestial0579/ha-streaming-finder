@@ -114,11 +114,17 @@ class StreamingFinderOptionsFlow(OptionsFlow):
         sitzung = async_get_clientsession(self.hass)
         fehler: dict[str, str] = {}
         if user_input is not None and self._anfrage:
+            konto_token = None
             try:
                 konto_token, konto_id = await quellen.freigabe_abholen(sitzung, lese, self._anfrage)
                 sitzungs_id, konto_v3 = await quellen.sitzung_aus_konto_token(sitzung, lese, konto_token)
             except quellen.QuellenFehler:
                 fehler["base"] = "nicht_freigegeben"
+                if konto_token:
+                    # Freigabe abgeholt, Sitzung gescheitert: Der Konto-Token existiert bei TMDB,
+                    # die Anfrage ist verbraucht. Token widerrufen, beim nächsten Senden neu anfragen.
+                    await quellen.zugang_widerrufen(sitzung, lese, None, konto_token)
+                    self._anfrage = None
             else:
                 if self.config_entry.options.get(CONF_KONTO_TOKEN):
                     # Inzwischen anderswo verbunden: die eben erzeugten Zugänge nicht verwaist lassen.
