@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import AsyncMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -11,7 +11,15 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 
 from custom_components.streaming_finder import quellen
-from custom_components.streaming_finder.const import CONF_KONTO_ID, CONF_KONTO_SITZUNG, CONF_KONTO_TOKEN, CONF_KONTO_V3, DOMAIN
+from custom_components.streaming_finder.const import (
+    CONF_KONTO_ID,
+    CONF_KONTO_SITZUNG,
+    CONF_KONTO_TOKEN,
+    CONF_KONTO_V3,
+    DOMAIN,
+    MERKLISTE_STUNDEN,
+    MERKLISTE_WIEDERHOLUNG_MINUTEN,
+)
 from custom_components.streaming_finder.finder import Finder, lese_token
 from custom_components.streaming_finder.merkliste import (
     MerklisteKoordinator,
@@ -99,3 +107,27 @@ async def test_gestoerte_merkliste_haelt_den_eintrag_nicht_auf(hass: HomeAssista
     zustaende = {s.entity_id: s.state for s in hass.states.async_all("todo")}
     assert list(zustaende.values()) == ["unavailable"], zustaende
     assert hass.services.has_service(DOMAIN, "anime_saison")
+
+
+async def test_gescheiterte_merkliste_versucht_es_bald_wieder(hass: HomeAssistant) -> None:
+    """#16: Ein Fehler beim Start darf die Merkliste nicht für Stunden ausfallen lassen."""
+    eintrag = MockConfigEntry(
+        domain=DOMAIN, data={"land": "DE", "sprache": "de-DE", "tmdb_token": "x"},
+        options={"tmdb_token": "x", CONF_KONTO_TOKEN: "k", CONF_KONTO_ID: "1"},
+    )
+    eintrag.add_to_hass(hass)
+    with patch.object(quellen, "merkliste", AsyncMock(side_effect=quellen.QuellenFehler("TMDB nicht erreichbar"))):
+        assert await hass.config_entries.async_setup(eintrag.entry_id)
+        await hass.async_block_till_done()
+        koordinator = eintrag.runtime_data.merkliste
+        assert koordinator.update_interval == timedelta(minutes=MERKLISTE_WIEDERHOLUNG_MINUTEN[0])
+        await koordinator.async_refresh()
+        assert koordinator.update_interval == timedelta(minutes=MERKLISTE_WIEDERHOLUNG_MINUTEN[1])
+        for _ in range(len(MERKLISTE_WIEDERHOLUNG_MINUTEN) + 2):
+            await koordinator.async_refresh()
+        assert koordinator.update_interval == timedelta(minutes=MERKLISTE_WIEDERHOLUNG_MINUTEN[-1])
+    with patch.object(quellen, "merkliste", AsyncMock(return_value=[])):
+        await koordinator.async_refresh()
+    assert koordinator.last_update_success
+    assert koordinator.fehlversuche == 0
+    assert koordinator.update_interval == timedelta(hours=MERKLISTE_STUNDEN)

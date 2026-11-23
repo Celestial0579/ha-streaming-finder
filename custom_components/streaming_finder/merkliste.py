@@ -32,6 +32,7 @@ from .const import (
     FILM_ARTEN,
     MERKLISTE_MAX_SEITEN,
     MERKLISTE_STUNDEN,
+    MERKLISTE_WIEDERHOLUNG_MINUTEN,
     TERMINE_TAGE_ZURUECK,
 )
 from .finder import Finder
@@ -104,8 +105,22 @@ class MerklisteKoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         )
         self.finder = finder
         self.termine: list[dict[str, Any]] = []
+        self.fehlversuche = 0
 
     async def _async_update_data(self) -> list[dict[str, Any]]:
+        """Nach einem Fehler bald neu versuchen statt erst nach MERKLISTE_STUNDEN (#16)."""
+        try:
+            daten = await self._abrufen()
+        except UpdateFailed:
+            stufe = min(self.fehlversuche, len(MERKLISTE_WIEDERHOLUNG_MINUTEN) - 1)
+            self.fehlversuche += 1
+            self.update_interval = timedelta(minutes=MERKLISTE_WIEDERHOLUNG_MINUTEN[stufe])
+            raise
+        self.fehlversuche = 0
+        self.update_interval = timedelta(hours=MERKLISTE_STUNDEN)
+        return daten
+
+    async def _abrufen(self) -> list[dict[str, Any]]:
         optionen = self.config_entry.options
         sitzung = async_get_clientsession(self.hass)
         ergebnis: list[dict[str, Any]] = []

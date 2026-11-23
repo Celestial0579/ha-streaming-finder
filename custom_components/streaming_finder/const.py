@@ -19,6 +19,8 @@ DIENST_MERKLISTE = "merkliste"
 DIENST_MERKLISTE_ENTFERNEN = "merkliste_entfernen"
 
 MERKLISTE_STUNDEN = 6
+# Nach einem gescheiterten Abruf der Merkliste: Abstände der Wiederholungen in Minuten, danach wieder MERKLISTE_STUNDEN.
+MERKLISTE_WIEDERHOLUNG_MINUTEN = (1, 5, 15, 60)
 TERMINE_TAGE_ZURUECK = 14
 FILM_ARTEN = {3: "Kinostart", 4: "Digital", 5: "DVD/Blu-ray", 6: "im Fernsehen"}
 MERKLISTE_MAX_SEITEN = 10
